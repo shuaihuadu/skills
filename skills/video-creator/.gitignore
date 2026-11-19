@@ -6,6 +6,7 @@ output/
 
 # Working copies
 src/
+!assets/prism/src/
 
 # Python
 __pycache__/

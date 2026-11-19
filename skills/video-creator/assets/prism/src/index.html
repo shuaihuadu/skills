@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>白光穿过棱镜</title>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        height: 100dvh;
+        display: grid;
+        place-items: center;
+        background: #101719;
+        color: #f7faf7;
+        font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    }
+
+    main {
+        width: min(100%, 177.778dvh);
+        aspect-ratio: 16/9;
+        position: relative;
+        background: linear-gradient(155deg, #39494c 0%, #202d30 38%, #182225 68%, #11191b 100%);
+        overflow: hidden;
+    }
+
+    canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    .lettering {
+        position: absolute;
+        inset: 0 auto auto 0;
+        width: 1920px;
+        height: 1080px;
+        transform-origin: top left;
+        pointer-events: none;
+    }
+
+    h1 {
+        position: absolute;
+        left: 112px;
+        top: 82px;
+        margin: 0;
+        font: 500 82px/1.2 'Noto Serif SC', 'Songti SC', SimSun, serif;
+    }
+
+    #subtitle-bar {
+        position: absolute;
+        bottom: 60px;
+        inset-inline: 112px;
+        text-align: center;
+        font-size: 54px;
+        line-height: 1.35;
+        text-wrap: balance;
+    }
+
+    button {
+        position: absolute;
+        right: 5%;
+        top: 7%;
+        font: inherit;
+        color: inherit;
+        background: #192528;
+        padding: 6px 14px;
+        border: 1px solid #8a9999;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+</style>
+<main>
+    <canvas aria-label="棱镜色散光路示意"></canvas>
+    <div class="lettering">
+        <h1>白光穿过棱镜</h1>
+        <div id="subtitle-bar"><span id="subtitle-text"></span></div>
+    </div>
+    <button hidden>播放旁白</button>
+</main>
+<script type="module">
+    const params = new URLSearchParams(location.search);
+    const caption = document.querySelector('#subtitle-text');
+    const button = document.querySelector('button');
+    const clamp = value => Math.max(0, Math.min(1, value));
+
+    async function resource(path) {
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(`${response.status}: ${path}`);
+        return response;
+    }
+
+    function makeOptics(THREE) {
+        const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector('canvas'), antialias: true, alpha: true });
+        renderer.setSize(1280, 720, false);
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.1, 60);
+        scene.add(new THREE.HemisphereLight(0xf5fffa, 0x496575, 1.3));
+        const key = new THREE.DirectionalLight(0xf5fffe, 2.6);
+        key.position.set(-4, 6, 2);
+        scene.add(key);
+
+        const outline = new THREE.Shape();
+        outline.moveTo(-1.35, -1.1);
+        outline.lineTo(1.35, -1.1);
+        outline.lineTo(0, 1.25);
+        outline.closePath();
+        const prism = new THREE.ExtrudeGeometry(outline, { depth: 1.35, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.035, bevelSegments: 1 });
+        prism.translate(0, 0, -0.675);
+        scene.add(new THREE.Mesh(prism, new THREE.MeshPhongMaterial({ color: 0xa9c8cf, specular: 0xffffff, shininess: 75, flatShading: true, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide })));
+        scene.add(new THREE.LineSegments(new THREE.EdgesGeometry(prism, 48), new THREE.LineBasicMaterial({ color: 0xcbdcd9, transparent: true, opacity: 0.56 })));
+
+        function beam(from, to, color, radius) {
+            const direction = to.clone().sub(from);
+            const length = direction.length();
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1, 8), new THREE.MeshBasicMaterial({ color }));
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+            scene.add(mesh);
+            return amount => {
+                mesh.visible = amount > 0;
+                mesh.scale.y = length * amount;
+                mesh.position.copy(from).addScaledVector(direction, length * amount / 2);
+            };
+        }
+        const entry = new THREE.Vector3(-0.72, 0, 0);
+        const exit = new THREE.Vector3(0.83, -0.2, 0);
+        const incident = beam(new THREE.Vector3(-4.7, 0, 0), entry, 0xfffdf0, 0.024);
+        const inside = beam(entry, exit, 0xfffdf0, 0.021);
+        const stops = [0xff5550, 0xff9946, 0xffdc70, 0x84dc8c, 0x54d5e6, 0x629afa, 0x9776eb];
+        const positions = [], colors = [];
+        for (let band = 0; band < stops.length - 1; band++) {
+            positions.push(0, 0, 0, 3.65, -0.42 - band * 0.19, 0, 3.65, -0.42 - (band + 1) * 0.19, 0);
+            for (const color of [0xfffdf0, stops[band], stops[band + 1]]) colors.push(...new THREE.Color(color).toArray());
+        }
+        const fan = new THREE.BufferGeometry();
+        fan.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        fan.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        const spectrum = new THREE.Mesh(fan, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+        spectrum.position.copy(exit);
+        scene.add(spectrum);
+        return (elapsed, split) => {
+            const dolly = clamp(elapsed / 2300);
+            const ease = dolly * dolly * (3 - 2 * dolly);
+            camera.position.set(3.2 - 1.2 * ease, 2.25 - 0.65 * ease, 9.6);
+            camera.lookAt(0.18, -0.06, 0);
+            incident(clamp(elapsed / 1050));
+            inside(clamp((elapsed - 1050) / 800));
+            const spread = clamp((elapsed - split) / 1200);
+            spectrum.visible = spread > 0;
+            spectrum.scale.setScalar(spread);
+            renderer.render(scene, camera);
+        };
+    }
+
+    async function start() {
+        const stage = document.querySelector('main');
+        const lettering = document.querySelector('.lettering');
+        const fit = () => { lettering.style.transform = `scale(${stage.getBoundingClientRect().width / 1920})`; };
+        fit();
+        new ResizeObserver(fit).observe(stage);
+        const config = await (await resource('../video-config.json')).json();
+        const [first, second] = config.scenes;
+        const total = first.duration + second.duration;
+        const { loadCaptions } = await import('./captions.js');
+        const tracks = await loadCaptions(config.scenes);
+        const draw = makeOptics(await import('../node_modules/three/build/three.module.js'));
+        await document.fonts.ready;
+        function renderAt(elapsed) {
+            const index = elapsed < first.duration ? 0 : 1;
+            const local = elapsed - (index === 0 ? 0 : first.duration);
+            const cue = tracks[index].find(item => item.start <= local && local < item.end);
+            caption.textContent = cue?.text ?? '';
+            draw(elapsed, first.duration + (tracks[1][0]?.start ?? 0));
+            return index;
+        }
+        function play(withAudio) {
+            button.hidden = true;
+            const voice = withAudio ? new Audio() : null;
+            let previous = -1;
+            const origin = performance.now();
+            window.__playbackStartedMs = origin;
+            function tick() {
+                const elapsed = Math.min(total, performance.now() - origin);
+                const index = renderAt(elapsed);
+                if (voice && previous !== index) {
+                    voice.pause();
+                    if (config.scenes[index].narration.trim()) {
+                        voice.src = `../assets/audio/scene_${index + 1}.mp3`;
+                        voice.play().catch(error => console.error(error));
+                    }
+                }
+                previous = index;
+                if (elapsed < total) requestAnimationFrame(tick);
+                else if (voice) button.hidden = false;
+            }
+            tick();
+        }
+        renderAt(0);
+        if (params.has('at')) renderAt(Math.min(total, Math.max(0, Number(params.get('at')))));
+        else if (params.get('headless') === 'true') play(false);
+        else { button.hidden = false; button.onclick = () => play(true); }
+    }
+    start().catch(error => { window.__playbackError = caption.textContent = String(error); console.error(error); });
+</script>
+
+</html>

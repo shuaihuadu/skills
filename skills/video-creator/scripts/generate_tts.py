@@ -73,6 +73,7 @@ async def main():
     # Output to assets/audio/ relative to config file location
     project_dir = os.path.dirname(config_path)
     output_dir = os.path.join(project_dir, "assets", "audio")
+    os.makedirs(output_dir, exist_ok=True)
 
     print(f"Voice: {voice}  Rate: {rate}")
     print(f"Output: {output_dir}\n")

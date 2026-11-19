@@ -31,7 +31,7 @@ const params = new URLSearchParams(window.location.search);
 const headless = params.get('headless') === 'true';
 ```
 
-当 `headless=true` 时，**立即自动开始播放**（不显示任何"点击开始"按钮）。
+当 `headless=true` 时，资源就绪后自动开始播放，不等待点击、音频授权或 `audio.play()`。配置、字幕或必要素材加载失败时报告具体路径，不要把错误页当作已就绪。
 
 ### 2. 播放开始信号
 
@@ -41,8 +41,12 @@ const headless = params.get('headless') === 'true';
 window.__playbackStartedMs = performance.now();
 ```
 
-构建脚本通过此信号测量页面启动延迟并裁剪视频开头。
+构建器用片尾校准帧把此起点映射到录像时间戳；校准帧不进成片。启动失败时设置 `window.__playbackError = String(error)`，不要发成功信号。
 **这是最关键的约定，必须实现。**
+
+先画首帧，再用同一个 `performance.now()` 值初始化播放起点和信号。每一帧按 `performance.now() - 起点` 计算镜头、动作和字幕；不要在绘制回调内重置起点，也不要靠帧数或未播放的 `audio.currentTime` 计时。若提供 `?at=毫秒`，让它调用同一个绘制函数一次且不启动时钟。定点预览用于检查构图，不能替代实际录制。
+
+Three.js 页面遵守同一合约。参见[三维手册与可执行样例](THREEJS.md)。
 
 ### 3. 字幕显示
 
@@ -56,7 +60,7 @@ window.__playbackStartedMs = performance.now();
 
 并实现以下逻辑：
 
-1. 从 `../assets/audio/scene_N.srt` 加载每个场景的 SRT 字幕文件
+1. 只为有旁白的镜头从 `../assets/audio/scene_N.srt` 加载字幕；缺失或任何一条格式错误都报告文件路径并停止启动。静默镜头不加载、不播音，进入时清空上一镜字幕。
 2. 解析 SRT 时间码
 3. 根据当前播放时间显示对应的字幕文本
 4. **在 headless 模式下使用 wall-clock 时间驱动字幕**（headless 模式下音频不会播放）
@@ -117,41 +121,7 @@ AI 生成自定义 HTML 时，`video-config.json` 只需包含以下字段：
 
 其他所有字段（如 `language`、`voiceRate`、`voiceVolume`）都有默认值。
 
-AI 可以在 scenes 里添加任意自定义字段（如 `heading`、`type`、`items` 等），
-供自己生成的 HTML/JS 读取。**构建脚本只关心 `narration` 和 `duration`。**
-
-## 推荐模式
-
-```javascript
-// AI 生成的 index.html 推荐的启动模式
-(async function () {
-    const params = new URLSearchParams(window.location.search);
-    const headless = params.get('headless') === 'true';
-
-    // 1. 加载配置
-    const config = await fetch('../video-config.json').then(r => r.json());
-
-    // 2. 构建场景 DOM（AI 自由发挥）
-    buildScenes(config);
-
-    // 3. 加载字幕
-    const subtitles = await loadSubtitles(config.scenes.length);
-
-    // 4. 开始播放
-    if (headless) {
-        startAutoPlay(config, subtitles);
-    } else {
-        document.getElementById('start-btn').addEventListener('click', () => {
-            startAutoPlay(config, subtitles);
-        });
-    }
-
-    function startAutoPlay(config, subtitles) {
-        window.__playbackStartedMs = performance.now();  // ← 关键信号
-        // ... 按 duration 依次切换场景，同步字幕
-    }
-})();
-```
+自定义字段供作者的 HTML/JS 读取，见[配置参考](CONFIG-SCHEMA.md)。构建器检查逐段时长和可选的全片上限 `maxDurationMs`；它不要求每段旁白创建或替换一页 DOM。
 
 ## 字幕样式参考
 
@@ -175,13 +145,11 @@ AI 可以在 scenes 里添加任意自定义字段（如 `heading`、`type`、`i
 
 ## 完整参考实现（仅供理解合约逻辑）
 
-以下代码**仅展示 4 个约定的最小技术实现**。
+把 [captions.js](../assets/prism/src/captions.js) 复制到项目 `src/`，与下面的入口放在一起。以下代码展示录制时钟和字幕，不提供美术模板。
 **不要照搬其页面结构和场景切换方式。**
 AI 应自行设计场景的 DOM 结构、布局方式、切换动画。
 
-> 注意：下面用 `display:none/block` 做场景切换只是最简单的示例。
-> 实际生成时应使用更丰富的方式：CSS transform 过渡、opacity 渐变、
-> 滑动/缩放/3D翻转、Canvas 重绘、甚至同屏多区域并行展示等。
+> `index` 用于定位旁白段和字幕，`local` 用于安排段内动作，`elapsed` 可驱动跨段连续动作。何时切镜取决于下一条证据出现在哪里，不取决于字幕文件何时换号。例如调试演示可保持同一个编辑器，让观众看见一次修改怎样改变运行结果。无需给两段之间添加过场效果。
 
 ```html
 <!DOCTYPE html>
@@ -204,72 +172,43 @@ AI 应自行设计场景的 DOM 结构、布局方式、切换动画。
 
     <!-- 场景容器：结构完全自由，不必是 section 列表 -->
 
-    <script>
+    <script type="module">
     (async function() {
         // === 约定 1：headless 检测 ===
         const headless = new URLSearchParams(location.search).get('headless') === 'true';
 
         // === 加载配置（必须） ===
-        const config = await fetch('../video-config.json').then(r => r.json());
+        const response = await fetch('../video-config.json');
+        if (!response.ok) throw new Error(`../video-config.json: HTTP ${response.status}`);
+        const config = await response.json();
         const durations = config.scenes.map(s => s.duration);
 
         // === 约定 3：加载字幕（必须） ===
-        const subs = {};
-        for (let i = 0; i < config.scenes.length; i++) {
-            try {
-                const r = await fetch('../assets/audio/scene_' + (i+1) + '.srt');
-                if (r.ok) subs[i+1] = parseSRT(await r.text());
-            } catch(e) {}
+        const { loadCaptions } = await import('./captions.js');
+        const tracks = await loadCaptions(config.scenes);
+        await document.fonts.ready;
+        const total = durations.reduce((sum, duration) => sum + duration, 0);
+        function renderAt(elapsed) {
+            let index = 0, local = elapsed;
+            while (index + 1 < durations.length && local >= durations[index]) local -= durations[index++];
+            const cue = tracks[index].find(cue => cue.start <= local && local < cue.end);
+            document.querySelector('#subtitle-text').textContent = cue?.text ?? '';
+            // 在此用同一 index、local 绘制主体和动作。
         }
-
-        let globalStart = 0, subTimer = null;
-
-        // === 约定 3：字幕同步（必须） ===
-        function syncSubs(sceneId) {
-            if (subTimer) clearInterval(subTimer);
-            const cues = subs[sceneId];
-            if (!cues) return;
-            let offset = 0;
-            for (let i = 0; i < sceneId - 1; i++) offset += durations[i];
-            subTimer = setInterval(() => {
-                const t = Math.max(0, (performance.now() - globalStart - offset) / 1000);
-                const c = cues.find(c => t >= c.start && t <= c.end);
-                document.getElementById('subtitle-text').textContent = c ? c.text : '';
-            }, 100);
-        }
-
-        function parseSRT(srt) {
-            const cues = [];
-            for (const block of srt.replace(/\r\n/g,'\n').trim().split(/\n\n+/)) {
-                const lines = block.split('\n');
-                if (lines.length < 3) continue;
-                const m = lines[1].match(/(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})/);
-                if (!m) continue;
-                cues.push({ start: +m[1]*3600+ +m[2]*60+ +m[3]+ +m[4]/1000, end: +m[5]*3600+ +m[6]*60+ +m[7]+ +m[8]/1000, text: lines.slice(2).join(' ') });
+        renderAt(0);
+        if (headless) {
+            const origin = window.__playbackStartedMs = performance.now();
+            function tick() {
+                const elapsed = performance.now() - origin;
+                renderAt(Math.min(elapsed, total));
+                if (elapsed < total) requestAnimationFrame(tick);
             }
-            return cues;
+            requestAnimationFrame(tick);
         }
-
-        // === 场景切换（AI 自由实现）===
-        // 下面只是最简示例。实际应使用丰富的过渡动画。
-        function showScene(idx) {
-            syncSubs(idx + 1);
-            // AI 在这里实现自己的场景切换逻辑
-            // 可以是 CSS transform、Canvas 重绘、DOM 替换、opacity 过渡等任何方式
-        }
-
-        // === 约定 2：播放信号（必须） ===
-        function startAutoPlay() {
-            globalStart = performance.now();
-            window.__playbackStartedMs = globalStart;
-            showScene(0);
-            let cum = 0;
-            durations.forEach((d, i) => { if (i > 0) { const c = cum; setTimeout(() => showScene(i), c); } cum += d; });
-        }
-
-        if (headless) startAutoPlay();
-        else startAutoPlay();
-    })();
+    })().catch(error => {
+        window.__playbackError = document.querySelector('#subtitle-text').textContent = String(error);
+        console.error(error);
+    });
     </script>
 </body>
 </html>
