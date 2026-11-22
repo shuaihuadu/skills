@@ -15,22 +15,24 @@ compatibility: "制作依赖 HyperFrames、Node.js 22+、Chromium、FFmpeg/ffpro
 
 ## 2. 确认画幅与声音
 
-选题确定后、开始制作前，把未确定的制作参数放在同一条消息询问。用户已明确给出的参数不重复问；可以给推荐，但不替用户默认决定。
+选题确定后、开始制作前，把未确定且没有下述默认值的制作参数放在同一条消息询问。用户已明确给出的参数不重复问。
 
 - **视频比例（宽:高）**：列出常用选项并询问用户选择。`9:16` 竖屏（如 1080 × 1920，短视频常用）、`16:9` 横屏（如 1920 × 1080，适合宽画面）、`1:1` 方屏（如 1080 × 1080）、`4:5` 竖版信息流（如 1080 × 1350）、`3:4` 竖版（如 1080 × 1440）。接受用户自定义比例；目标平台已知时，在确认画幅时就核对其上传支持及预览裁切。渲染工具或平台不支持时说明限制并请用户选择，不擅自裁切、加黑边或换比例。
-- **旁白**：语言未指定时用对话语言，中文默认普通话。未指定具体音色时，列出下表全部普通话候选，另列北京话等方言选项，标明引擎和男女声；用户已限定引擎或声线时按其要求筛选。其他语言按对应引擎的音色清单给出候选。允许用户明确委托代选，也可以按题材推荐，但不因旧项目用过某个音色就自动沿用。
+- **旁白**：语言未指定时用对话语言，中文默认普通话。新作普通话旁白未指定音色且没有冲突的引擎、声线或方言要求时，默认用本机 Qwen3-TTS 1.7B CustomVoice 的女声 `Serena`，告知用户即可，不必再确认。用户指定的音色或限制优先；需要选音时，按语言和限制列出候选，标明引擎和已确认的男女声，未确认的以试听为准。修改同一期时沿用已确认的旁白，除非用户要求换声。
 - **交付目录**：使用用户指定的交付根目录。当前任务未给出、也没有已约定的路径时，和比例、声音一起确认。
 
 ### 中文旁白候选
 
 | 音色 | 声线 | 引擎 | 音色 ID |
 | --- | --- | --- | --- |
+| Serena（默认） | 女声，普通话 | Qwen3-TTS（本地） | `Serena` |
 | 小晓 | 女声，温暖 | Edge TTS（在线） | `zh-CN-XiaoxiaoNeural` |
 | 小伊 | 女声，活泼 | Edge TTS（在线） | `zh-CN-XiaoyiNeural` |
 | 云希 | 男声，阳光活泼 | Edge TTS（在线） | `zh-CN-YunxiNeural` |
 | 云健 | 男声，富有激情 | Edge TTS（在线） | `zh-CN-YunjianNeural` |
 | 云夏 | 男声，俏皮 | Edge TTS（在线） | `zh-CN-YunxiaNeural` |
 | 云扬 | 男声，专业稳重 | Edge TTS（在线） | `zh-CN-YunyangNeural` |
+| 本机普通话默认音色 | 以试听为准 | Kokoro ONNX v1.1-zh（本地） | `zf_001` |
 | 小北 | 女声 | Kokoro（本地） | `zf_xiaobei` |
 | 小妮 | 女声 | Kokoro（本地） | `zf_xiaoni` |
 | 小晓 | 女声 | Kokoro（本地） | `zf_xiaoxiao` |
@@ -39,12 +41,34 @@ compatibility: "制作依赖 HyperFrames、Node.js 22+、Chromium、FFmpeg/ffpro
 | 云健 | 男声 | Kokoro（本地） | `zm_yunjian` |
 | 云夏 | 男声 | Kokoro（本地） | `zm_yunxia` |
 | 云扬 | 男声 | Kokoro（本地） | `zm_yunyang` |
+| 中文示例音色 | 官方示例，以试听为准 | MegaTTS 3（本地） | `Chinese_prompt` |
 | 晓东（Dylan） | 年轻男声，北京话 | Qwen3-TTS（本地） | `Dylan` |
 
-- 以上是候选，不代表当前环境均可用。用 `edge-tts --list-voices` 核对在线目录；Kokoro 以[上游普通话目录](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md#mandarin-chinese)为准，HyperFrames 的 `tts --list` 只展示部分音色。检查所选引擎的运行依赖和可用性，未准备好的标明待配置。Kokoro 需要本地依赖及模型和音色文件，首次下载需要联网，准备后可离线合成。
-- **Dylan**：使用 [Qwen3-TTS 0.6B CustomVoice MLX 权重](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit)，通过 `mlx_audio.tts.generate` 传入本地 `--model` 路径和 `--voice Dylan --lang_code Chinese --audio_format wav --join_audio`，每个字幕句段输出一个 WAV，按实际音频重新校时。不需要 API Key 或参考录音；本地依赖、完整权重和离线试音未验证时标为「待配置」，不把官方样音当成本机验证。
+- 以上是候选，不代表当前环境均可用。用 `edge-tts --list-voices` 核对在线目录。Kokoro 的具名候选来自[上游普通话目录](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md#mandarin-chinese)，不等于本机 ONNX 音色包或 HyperFrames 内置目录；以实际选用的运行环境及音色清单为准，不猜测 `zf_001` 对应哪个名字。所选环境或音色未准备好时标为「待配置」，不把官方样音当成本机验证。
 - 用户想试听时，用同一句本期台词为其挑中的音色分别生成约 5–10 秒的样音，试听后再定。两家同名音色分别列出；只报名称且无法判断引擎时，补问引擎。
-- **配音引擎互备**：优先用选定的引擎和音色。若依赖未就绪、服务不可用或选定音色无法合成，在 Edge TTS、Kokoro 和已验证可用的 Qwen3-TTS 中选符合要求的备用音色。备用引擎能用时，直接选同语言、同为男声或女声、风格接近的音色继续，不必再确认；说明切换原因和实际使用的音色，不把同名音色说成同一个声音。替换同一旁白的所有片段，并按新音频重新对齐字幕。用户明确要求指定方言、只用指定音色或引擎、或只离线时，遵守这些限制；没有符合要求的可用音色时说明阻碍，不默默换声或改用在线服务。
+- **配音引擎互备**：优先用选定的引擎和音色。若依赖未就绪、服务不可用或选定音色无法合成，在 Edge TTS、Kokoro、Qwen3-TTS 和 MegaTTS 3 中选已验证可用、且符合声线和用途要求的备用音色。备用引擎能用时，直接选同语言、同为男声或女声、风格接近的音色继续，不必再确认；声线未确认的示例音色不自动替换。说明切换原因和实际使用的音色，不把同名音色说成同一个声音。替换同一旁白的所有片段，并按新音频重新对齐字幕。用户明确要求指定方言、只用指定音色或引擎、或只离线时，遵守这些限制；没有符合要求的可用音色时说明阻碍，不默默换声或改用在线服务。
+
+### 复用本机环境生成旁白
+
+用户选定本地引擎和音色后，若 `D:\TTS\local` 中对应的解释器、脚本、模型及所选音色都就绪，直接调用现有环境。不为同一配音重复安装、下载模型或调用 `hyperframes tts`，也不启动网页语音台。没有这个目录或缺所选音色时，先检查是否已有支持该音色的其他环境；需要换引擎或音色时按互备规则处理。
+
+- **Qwen3-TTS 1.7B CustomVoice**：普通话默认显式传 `--language zh --voice Serena`；北京话可用 `zh` / `Dylan`，英文可用 `en` / `Ryan`。按需传 `--instruct` 指定语气。只在其他机器已有对应 MLX 环境和权重时，才考虑用 `mlx_audio.tts.generate` 和本地 [0.6B CustomVoice MLX 权重](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit)；不同版本不要混用在同一旁白中。
+- **Kokoro ONNX v1.1-zh**：本机已验证 `zh` / `zf_001` 和 `en` / `af_maple`，其他音色按本机音色包核对。可传 `--speed`，范围 `0.5` 至 `2.0`。
+- **MegaTTS 3**：普通话用 `zh` / `Chinese_prompt`，英文用 `en` / `English_prompt`；中英混读用 `mixed`，试听两种语言的发音后选一个官方音色。当前适配只使用官方成对的 WAV 和 `.npy`，不上传自定义参考录音，也不做人声克隆。公开发布或商用前，单独核对示例音色及生成音频的使用权，并记入本期 `资料与授权.md`；代码或权重的许可证不等于音色授权。未确认授权不发布该音色，按互备规则处理。
+
+先试听本期短句，再按自然段合成；当前脚本每次调用都加载模型，不要按字幕行逐句调用。在本期视频目录下运行，先准备 UTF-8 台词稿 `project/assets/narration/01.txt`；以下为普通话示例，按已选的引擎只运行对应的一条：
+
+```powershell
+$tts = 'D:\TTS\local'
+$inputText = '.\project\assets\narration\01.txt'
+$outputWav = '.\project\assets\narration\01.wav'
+& "$tts\qwen\.venv\Scripts\python.exe" "$tts\qwen\speak.py" --text-file $inputText --language zh --voice Serena --out $outputWav
+& "$tts\kokoro\.venv\Scripts\python.exe" "$tts\kokoro\speak.py" --text-file $inputText --language zh --voice zf_001 --out $outputWav
+& "$tts\megatts3\.venv\python.exe" "$tts\megatts3\speak.py" --text-file $inputText --language zh --voice Chinese_prompt --out $outputWav
+```
+
+- **同一期复用 WAV**：在旁白目录保留成功生成时的分段原稿、实际引擎和模型版本、语言、音色及合成参数（如语气、语速）。改画面、字幕样式或重渲染时，有能读取且与这些记录完全匹配的 WAV 就直接复用；仅重做记录不匹配或音频缺失、损坏的段落。不能只凭文件名判定命中。换音色时仍统一重做该旁白的所有片段。
+- **交给 HyperFrames**：确认输出 WAV 可读取、非静音，用 `ffprobe` 取实际时长并按实际发音对齐字幕。在 `project/index.html` 用定时 `<audio>` 引用工程相对路径，例如 `assets/narration/01.wav`。预览和渲染只读工程内音频，不在 HTML 里调用合成服务。改了某段音频或时间线位置时，更新受影响的字幕时间及后续片段起点。
 
 ## 3. 每条视频单独建目录
 
@@ -68,7 +92,7 @@ compatibility: "制作依赖 HyperFrames、Node.js 22+、Chromium、FFmpeg/ffpro
 
 先读[画面、字幕与成片验收](./references/video-quality.md)；按 `hyperframes`、`hyperframes-cli` 的规范创建可编辑工程。使用确认的画幅，默认 30 fps。按讲清内容所需的长度制作，不凑时长。
 
-1. **先试关键镜头。** 分镜逐段写清「观众要看懂什么、画面靠什么讲清、在哪句旁白揭示」。先合成并实测旁白，再做能代表成片的关键镜头样片；用手机尺寸检查主体、动作和最长字幕，通过后再扩到全片。
+1. **先试关键镜头。** 分镜逐段写清「观众要看懂什么、画面靠什么讲清、在哪句旁白揭示」。先生成旁白或复用本期匹配的 WAV，并按实际音频校时，再做能代表成片的关键镜头样片；用手机尺寸检查主体、动作和最长字幕，通过后再扩到全片。
 2. **字幕优先可读。** 按实际语音校时并烧录进成片。位置靠下，选在目标平台安全区内能放到的最低位置；白字深描边、最多两行，**不加背景色、色块或横条**。用平台预览或安全区遮罩检查，别只看一张无遮挡的本地截图。
 3. **验收实际交付件。** 通过 HyperFrames 检查、画面审片和音轨检查后导出 MP4 及单独封面。用 `ffprobe` 和编码后解码抽查验证，发现影响观看的问题先修复再交付。修改后重新导出并验证，不能只改工程就把旧 MP4 当新版交付。
 
