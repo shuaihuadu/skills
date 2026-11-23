@@ -1,7 +1,0 @@
-{
-    "name": "video-creator-prism",
-    "private": true,
-    "dependencies": {
-        "three": "0.180.0"
-    }
-}
