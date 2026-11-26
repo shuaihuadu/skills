@@ -22,14 +22,16 @@ compatibility: "默认制作依赖 HyperFrames、Node.js 22+、Chromium 和 FFmp
 
 - **视频比例（宽:高）**：列出常用选项并询问用户选择。`9:16` 竖屏（如 1080 × 1920，短视频常用）、`16:9` 横屏（如 1920 × 1080，适合宽画面）、`1:1` 方屏（如 1080 × 1080）、`4:5` 竖版信息流（如 1080 × 1350）、`3:4` 竖版（如 1080 × 1440）。接受用户自定义比例；目标平台已知时，在确认画幅时就核对其上传支持及预览裁切。渲染工具或平台不支持时说明限制并请用户选择，不擅自裁切、加黑边或换比例。
 - **声音与字幕**：按片型选同期声、现成录音、合成旁白、配乐、音效或静音。用户要求无旁白或已有合适录音时跳过合成和音色选择。有口语内容且用户未指定字幕形式时，默认用同步字幕；仅关键词或不加字幕优先遵守用户要求，并核对目标平台或项目的无障碍要求。没有口语内容时不自动生成旁白字幕。
-- **合成旁白（仅在需要时）**：语言未指定时用对话语言，中文默认普通话。新作普通话旁白未指定音色且没有冲突的引擎、声线或方言要求时，默认用本机 Qwen3-TTS 1.7B CustomVoice 的女声 `Serena`，告知用户即可，不必再确认。用户指定的音色或限制优先；需要选音时，按语言和限制列出候选，标明引擎和已确认的男女声，未确认的以试听为准。修改同一期时沿用已确认的旁白，除非用户要求换声。
+- **合成旁白（仅在需要时）**：语言未指定时用对话语言，中文默认普通话。新作普通话旁白未指定音色且没有冲突的引擎或方言要求时，女声用本机 Qwen3-TTS 1.7B CustomVoice 的 `Vivian`，男声用本机 MegaTTS 3 的 `Chinese_prompt`；未指定男女声时用 `Vivian`。两者默认用平实、自然的普通话，不额外加情绪或表演风格，告知用户即可，不必再确认。用户指定的音色或限制优先；需要选音时，按语言和限制列出候选，标明引擎和已确认的男女声，未确认的以试听为准。修改同一期时沿用已确认的旁白，除非用户要求换声。
 - **交付目录**：使用用户指定的交付根目录。当前任务未给出、也没有已约定的路径时，和比例、声音一起确认。
 
 ### 中文旁白候选
 
 | 音色 | 声线 | 引擎 | 音色 ID |
 | --- | --- | --- | --- |
-| Serena（默认） | 女声，普通话 | Qwen3-TTS（本地） | `Serena` |
+| Vivian（默认女声） | 女声，普通话 | Qwen3-TTS（本地） | `Vivian` |
+| 中文示例音色（默认男声） | 男声，普通话 | MegaTTS 3（本地） | `Chinese_prompt` |
+| Serena | 女声，普通话 | Qwen3-TTS（本地） | `Serena` |
 | 小晓 | 女声，温暖 | Edge TTS（在线） | `zh-CN-XiaoxiaoNeural` |
 | 小伊 | 女声，活泼 | Edge TTS（在线） | `zh-CN-XiaoyiNeural` |
 | 云希 | 男声，阳光活泼 | Edge TTS（在线） | `zh-CN-YunxiNeural` |
@@ -46,7 +48,6 @@ compatibility: "默认制作依赖 HyperFrames、Node.js 22+、Chromium 和 FFmp
 | 云健 | 男声 | Kokoro（本地） | `zm_yunjian` |
 | 云夏 | 男声 | Kokoro（本地） | `zm_yunxia` |
 | 云扬 | 男声 | Kokoro（本地） | `zm_yunyang` |
-| 中文示例音色 | 官方示例，以试听为准 | MegaTTS 3（本地） | `Chinese_prompt` |
 | 晓东（Dylan） | 年轻男声，北京话 | Qwen3-TTS（本地） | `Dylan` |
 
 - 以上是候选，不代表当前环境均可用。用 `edge-tts --list-voices` 核对在线目录。Kokoro 的具名候选来自[上游普通话目录](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md#mandarin-chinese)，不等于本机 ONNX 音色包或 HyperFrames 内置目录；以实际选用的运行环境及音色清单为准，不猜测 `zf_001` 对应哪个名字。所选环境或音色未准备好时标为「待配置」，不把官方样音当成本机验证。
@@ -57,9 +58,9 @@ compatibility: "默认制作依赖 HyperFrames、Node.js 22+、Chromium 和 FFmp
 
 用户选定本地引擎和音色后，若 `D:\TTS\local` 中对应的解释器、脚本、模型及所选音色都就绪，直接调用现有环境。不为同一配音重复安装、下载模型或调用 `hyperframes tts`，也不启动网页语音台。没有这个目录或缺所选音色时，先检查是否已有支持该音色的其他环境；需要换引擎或音色时按互备规则处理。
 
-- **Qwen3-TTS 1.7B CustomVoice**：普通话默认显式传 `--language zh --voice Serena`；北京话可用 `zh` / `Dylan`，英文可用 `en` / `Ryan`。按需传 `--instruct` 指定语气。只在其他机器已有对应 MLX 环境和权重时，才考虑用 `mlx_audio.tts.generate` 和本地 [0.6B CustomVoice MLX 权重](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit)；不同版本不要混用在同一旁白中。
+- **Qwen3-TTS 1.7B CustomVoice**：普通话默认女声显式传 `--language zh --voice Vivian`，省略 `--instruct`（默认为空），不添加风格指令；只有用户明确要求特定语气时才传 `--instruct`。北京话可用 `zh` / `Dylan`，英文可用 `en` / `Ryan`。只在其他机器已有对应 MLX 环境和权重时，才考虑用 `mlx_audio.tts.generate` 和本地 [0.6B CustomVoice MLX 权重](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit)；不同版本不要混用在同一旁白中。
 - **Kokoro ONNX v1.1-zh**：本机已验证普通话音色 `zf_001`、`zm_089`（`zh`）和英文音色 `af_maple`（`en`），其他音色按本机音色包核对。可传 `--speed`，范围 `0.5` 至 `2.0`。
-- **MegaTTS 3**：普通话用 `zh` / `Chinese_prompt`，英文用 `en` / `English_prompt`；中英混读用 `mixed`，试听两种语言的发音后选一个官方音色。当前适配只使用官方成对的 WAV 和 `.npy`，不上传自定义参考录音，也不做人声克隆。公开发布或商用前，单独核对示例音色及生成音频的使用权，并记入本期 `资料与授权.md`；代码或权重的许可证不等于音色授权。未确认授权不发布该音色，按互备规则处理。
+- **MegaTTS 3**：普通话默认男声显式传 `--language zh --voice Chinese_prompt`，沿用本地脚本固定的 `time_step=10`、`p_w=1.6`、`t_w=2.5`；这些不是命令行参数，也不传 `--instruct`。英文用 `en` / `English_prompt`；中英混读用 `mixed`，试听两种语言的发音后选一个官方音色。当前适配只使用官方成对的 WAV 和 `.npy`，不上传自定义参考录音，也不做人声克隆。公开发布或商用前，单独核对示例音色及生成音频的使用权，并记入本期 `资料与授权.md`；代码或权重的许可证不等于音色授权。未确认授权不发布该音色，按互备规则处理。
 
 先试听本期短句，再按自然段合成；当前脚本每次调用都加载模型，不要按字幕行逐句调用。在本期视频目录下运行，先准备 UTF-8 台词稿 `project/assets/narration/01.txt`；以下为普通话示例，按已选的引擎只运行对应的一条：
 
@@ -67,7 +68,7 @@ compatibility: "默认制作依赖 HyperFrames、Node.js 22+、Chromium 和 FFmp
 $tts = 'D:\TTS\local'
 $inputText = '.\project\assets\narration\01.txt'
 $outputWav = '.\project\assets\narration\01.wav'
-& "$tts\qwen\.venv\Scripts\python.exe" "$tts\qwen\speak.py" --text-file $inputText --language zh --voice Serena --out $outputWav
+& "$tts\qwen\.venv\Scripts\python.exe" "$tts\qwen\speak.py" --text-file $inputText --language zh --voice Vivian --out $outputWav
 & "$tts\kokoro\.venv\Scripts\python.exe" "$tts\kokoro\speak.py" --text-file $inputText --language zh --voice zf_001 --out $outputWav
 & "$tts\megatts3\.venv\python.exe" "$tts\megatts3\speak.py" --text-file $inputText --language zh --voice Chinese_prompt --out $outputWav
 ```
